@@ -1,0 +1,363 @@
+================================================================================
+CONCLUDED RESULTS — Dissertation Lab (Plain-Language Guide)
+================================================================================
+
+Project: Evaluation of behavioural biometrics (typing rhythm) in Zero Trust-
+style security against AI-generated fake typing (“impersonation” attacks).
+
+This file explains, in everyday language:
+  1) What this lab does
+  2) Why it is set up the way it is
+  3) How the codebase is organised
+  4) What the experiment results show
+  5) What those results mean
+  6) Validity upgrades now available in the lab
+
+*** LATEST RESULTS HEADLINE (full cohort, 51 subjects, Aug 2026) ***
+  Human impostor FAR ≈ 4.6%  |  VAE attack FAR ≈ 99.6%  |  GAN attack FAR ≈ 97.6%
+  Wilcoxon test: attack FAR > human FAR, p ≈ 2.57×10⁻¹⁰ (both VAE and GAN)
+  Conclusion: typing-based UEBA works against other humans but fails against
+  AI-generated impersonation on the full dataset.
+
+
+--------------------------------------------------------------------------------
+1. WHAT THIS LAB DOES (SIMPLE SUMMARY)
+--------------------------------------------------------------------------------
+
+Modern cybersecurity often uses an idea called “Zero Trust”: never assume a
+user is safe just because they are “inside” the network. Instead, keep
+checking who they are.
+
+One way to keep checking identity is behavioural biometrics — looking at
+habits such as HOW someone types (how long each key is held, how long between
+keys), not only WHETHER they know the password.
+
+In this lab we:
+
+  A) Train a small “gatekeeper” AI (a Policy Engine) on REAL human typing
+     data, so it learns one authorised user’s typing rhythm.
+
+  B) Measure how well that gatekeeper accepts the real user and rejects
+     OTHER real people (ordinary impostors).
+
+  C) Train a SECOND set of AIs (a VAE and a GAN) to invent FAKE typing
+     samples that mimic the authorised user’s rhythm.
+
+  D) Ask: when those fakes are shown to the gatekeeper, does it wrongly
+     accept them as the real person?
+
+In short: Can a typing-based security checker still tell humans from
+AI-imitated typing?
+
+
+--------------------------------------------------------------------------------
+2. WHY THE LAB IS SET UP THIS WAY (STEP BY STEP)
+--------------------------------------------------------------------------------
+
+Each important choice below has a plain-English meaning and a reason.
+
+
+STEP 1 — Use the CMU keystroke dataset
+  What it means:
+    Fifty-one volunteers typed the SAME strong password many times. Computers
+    recorded the timing of each key press and release.
+  Why:
+    It is a well-known public dataset and matches the dissertation proposal,
+    which calls for authentic human typing baselines such as CMU keystroke data.
+
+
+STEP 2 — Focus on Hold Time and Flight Time (feature set: “hold_flight”)
+  What it means:
+    • Hold Time  = how long a finger keeps a key pressed down
+    • Flight Time = how long it takes to move from one key to the next
+    Together these form each person’s “typing fingerprint” for this password.
+  Why:
+    The proposal describes UEBA (User and Entity Behaviour Analytics) based on
+    these kinds of timing signals. Hold + Flight are the main signals used here.
+
+
+STEP 3 — Split typing into “enrolment” and “verification”
+  What it means:
+    • Sessions 1–4: used to TEACH the gatekeeper the user’s normal pattern
+      (enrolment / training) — default “fixed” split.
+    • Session 5: held back and used only to TEST the gatekeeper later
+      (verification).
+    • Optional LOSO (leave-one-session-out): rotate which session is held out
+      so every session is used once as the test set.
+  Why:
+    Real security systems learn a baseline, then keep checking new behaviour.
+    We also avoid cheating by testing on the exact same samples used to train.
+    LOSO checks that findings are not unique to session 5.
+
+
+STEP 4 — Train the gatekeeper on HUMAN data only
+  What it means:
+    The gatekeeper sees authorised-user typing and other people’s typing.
+    It is NEVER trained on the AI-generated fakes.
+  Why:
+    That mirrors today’s systems (trained on real users) and gives a fair
+    stress test: if AI fakes get through, the weakness is real, not because we
+    secretly taught the gatekeeper to recognise fakes during training.
+
+
+STEP 5 — Use two gatekeeper algorithms: SVM and Random Forest
+  What it means:
+    Two different styles of “yes/no, is this the authorised user?” models:
+    • SVM (Support Vector Machine)
+    • Random Forest (many decision trees voting together)
+  Why:
+    If BOTH fail (or succeed) in similar ways, the finding is less likely to
+    be an accident of one algorithm. The proposal suggested these kinds of
+    supervised classifiers as a Policy Engine.
+
+
+STEP 6 — Attack with two generative models: VAE and GAN
+  What it means:
+    After the gatekeeper is trained, we train:
+    • a VAE (Variational Autoencoder) and
+    • a GAN (Generative Adversarial Network, here a WGAN-GP variant)
+    on the authorised user’s enrolment typing, then SAMPLE new fake typing
+    vectors that look statistically like that user.
+  Why:
+    The proposal asks whether Generative AI can impersonate behavioural
+    biometrics. Using BOTH methods lets us compare which fake is more
+    effective at fooling the gatekeeper.
+
+
+STEP 7 — Measure with TAR and FAR (and EER), plus statistics
+  What it means:
+    • TAR (True Acceptance Rate) = how often the REAL user is correctly accepted
+    • FAR (False Acceptance Rate) = how often an impostor is wrongly accepted
+    • EER (Equal Error Rate) = a balanced operating point used to pick a
+      yes/no threshold for the gatekeeper
+    • 95% CI (confidence interval) = how uncertain the average FAR is
+    • Wilcoxon signed-rank test = formal check that attack FAR > human FAR
+  Why:
+    These are standard biometrics metrics; CI and paired tests strengthen
+    dissertation claims beyond reporting a single mean.
+
+
+STEP 8 — Cohort size: pilot (5) or full (51)
+  What it means:
+    You can freely choose:
+      • --mode pilot  → first 5 subjects (fast everyday / MVP evidence)
+      • --mode full   → all 51 subjects (dissertation-scale evidence)
+    Or use wrappers: scripts/run_pilot.py / scripts/run_full.py
+  Why:
+    Training many generative models is slow. Pilot remains the default so
+    accidental long runs are avoided; full cohort is one flag away.
+
+
+--------------------------------------------------------------------------------
+3. HOW THE CODEBASE WORKS (FOR SOMEONE NEW TO THE PROJECT)
+--------------------------------------------------------------------------------
+
+Think of the folders as chapters in the same story:
+
+  data/raw/
+      The raw CMU CSV file of real human typing timings.
+
+  src/data/
+      Loads that file, checks it looks complete, and builds per-person
+      enrol / verify splits (including LOSO folds).
+
+  src/features/
+      Turns each typing repetition into Hold / Flight numbers the models
+      can use (and optional alternate feature views).
+
+  src/models/
+      • classifier.py  — the gatekeepers (SVM, Random Forest)
+      • vae.py         — one kind of typing faker
+      • gan.py         — another kind of typing faker
+
+  src/adversarial/
+      Glue that trains a faker on one user’s enrolment data and produces
+      synthetic impersonation samples for testing only.
+
+  src/evaluation/
+      Computes TAR, FAR, EER, attack FAR, 95% CIs, and Wilcoxon tests.
+
+  src/experiment/
+      Shared runner (run_single_subject) used by main, pilot, full, ablation.
+
+  scripts/
+      • run_experiment.py   — main end-to-end lab (--mode, --split-mode, …)
+      • run_pilot.py        — convenience: 5-subject pilot
+      • run_full.py         — convenience: all 51 subjects
+      • run_ablation.py     — enrollment-size and feature-set ablations
+      • generate_figures.py — redraw dissertation-style charts from CSVs
+
+  notebooks/
+      Interactive versions of the four phases (explore → features →
+      human baseline → adversarial evaluation).
+
+  results/
+      Saved numbers (CSV), charts (PNG), trained models, synthetic samples,
+      and run_meta.json (seed, versions, argv, mode, timestamp).
+
+  instructions.txt
+      Absolute-beginner steps to run pilot vs full and read outputs.
+
+  project_overview_intext
+      Single-file AI-oriented brief of the whole project.
+
+  requirements.txt
+      Pinned Python packages needed to run the lab.
+
+The four phases follow the dissertation methodology:
+
+  Phase 1 — Acquire human typing data
+  Phase 2 — Engineer Hold / Flight features
+  Phase 3 — Train the Policy Engine (gatekeeper) on humans only
+  Phase 4 — Generate AI impersonation samples; measure FAR / TAR
+
+
+--------------------------------------------------------------------------------
+4. WHAT THE RESULTS SHOW (LATEST FULL COHORT, 51 SUBJECTS)
+--------------------------------------------------------------------------------
+
+Source files for the numbers below (latest full run):
+  • results/human_baseline.csv
+  • results/attack_summary.csv
+  • results/statistical_summary.csv
+  • results/hypothesis_tests.csv
+  • results/attack_results.csv
+  • results/run_meta.json
+  • results/figures/human_baseline.png
+  • results/figures/far_comparison.png
+
+Run receipt (see run_meta.json):
+  mode=full | n_subjects=51 | feature_set=hold_flight | split_mode=fixed
+  enroll sessions 1–4, verify session 5 | classifier=SVM only
+  attacks=vae,gan | seed=42 | hyperparameter tuning=ON
+  run_id=full_42_20260827T042239Z | timestamp UTC 2026-08-27
+
+A) Against OTHER REAL PEOPLE (human impostors) — the gatekeeper works well.
+
+   Mean results across all 51 subjects (SVM Policy Engine):
+
+     TAR (True Acceptance Rate):  ~95.3%  (95% CI roughly 94.0%–96.5%)
+     FAR (False Acceptance Rate): ~4.6%   (95% CI roughly 3.3%–5.8%)
+     EER (Equal Error Rate):        ~0.7%  (mean across subjects)
+
+   Plain reading:
+     When the threat is “someone else typing,” the system usually recognises
+     the real person and rarely accepts other people. On the full cohort,
+     human impostor FAR is even lower than the earlier 5-subject pilot (~8%).
+
+
+B) Against AI-GENERATED impersonation — the gatekeeper largely fails.
+
+   Mean attack FAR (fraction of AI fakes wrongly accepted), with 95% CI:
+
+     VAE + SVM : ~99.6%  (CI roughly 99.4%–99.9%)
+     GAN + SVM : ~97.6%  (CI roughly 96.3%–98.8%)
+
+   Genuine TAR stays ~95.3% at the same EER threshold.
+
+   Formal paired tests (Wilcoxon signed-rank: attack FAR > human FAR), n=51:
+     VAE / SVM : ΔFAR = 0.9505 ; p = 2.572×10⁻¹⁰
+     GAN / SVM : ΔFAR = 0.9299 ; p = 2.572×10⁻¹⁰
+
+   (ΔFAR = mean attack FAR minus mean human FAR; see hypothesis_tests.csv)
+
+   Plain reading:
+     Almost every AI-made typing sample that mimicked the authorised user was
+     treated as legitimate. The gap vs human impostors is very large and
+     highly statistically significant on the full 51-subject cohort — far
+     stronger evidence than the earlier pilot (which had p ≈ 0.03 on n=5).
+
+
+C) Comparison to earlier pilot (5 subjects, for context)
+
+   The first pilot used 5 subjects, SVM + Random Forest, and --no-tune.
+   It showed the same direction (attack FAR ≈ 100%, human FAR ~6–8%) but
+   with wider uncertainty. The full cohort confirms and strengthens that
+   finding with tighter confidence intervals and much smaller p-values.
+
+
+D) Ablation and cross-session (optional deeper analysis)
+   Enrollment-size and feature-set ablations: scripts/run_ablation.py
+   Leave-one-session-out validation: --split-mode losso
+   See results/ablation_*.csv and results/cross_session_results.csv when run.
+
+
+--------------------------------------------------------------------------------
+5. WHAT THE RESULTS MEAN (CONCLUSION)
+--------------------------------------------------------------------------------
+
+ANSWER TO THE RESEARCH QUESTION:
+  No. A Policy Engine trained only on human keystroke data cannot reliably
+  reject VAE- or GAN-synthesized impersonation. On all 51 CMU subjects, the
+  SVM gatekeeper kept human impostor FAR near 4.6% but accepted roughly
+  98–100% of synthetic samples mimicking the authorised user.
+
+This lab supports three practical conclusions for Zero Trust / UEBA thinking:
+
+  1) Behavioural typing checks ARE effective against traditional impostors
+     (other humans) — TAR ~95%, human FAR ~4.6% on the full cohort.
+
+  2) The SAME checks are NOT effective against Generative AI impersonation.
+     VAE attack FAR ~99.6%; GAN attack FAR ~97.6% at the human EER threshold.
+
+  3) The dissertation “trust paradox” is empirically supported at scale:
+     behavioural signals used to “verify explicitly” can be copied by the
+     same class of technology meant to defend them. Wilcoxon tests confirm
+     attack FAR exceeds human FAR with overwhelming significance (p ≈ 10⁻¹⁰).
+
+What this means for security practice:
+  Keystroke-based continuous verification should not be treated as proof of
+  “human intent” on its own. Zero Trust architectures need additional,
+  non-mimic-able factors (hardware-bound keys, liveness, multi-modal signals)
+  when adversaries can train generative models on enrolment telemetry.
+
+Important caveats (honest limits of what we can claim):
+
+  • Latest primary numbers use SVM only (not Random Forest) on the full run.
+    Re-run with --classifiers svm,random_forest for a two-classifier table.
+
+  • The data is a lab password-typing study, not a live enterprise Zero Trust
+    deployment (no full PDP/PEP product stack).
+
+  • The password and key sequence are fixed across users; that makes fair
+    comparison easier, but real-world free typing may differ.
+
+  • Verification used session 5 only (split_mode=fixed). Use --split-mode
+    losso to test whether results hold across all sessions.
+
+  • The attack assumes the adversary can train on the target user’s enrolment
+    timings (a strong but clear threat model for a resilience stress test).
+
+
+--------------------------------------------------------------------------------
+6. VALIDITY UPGRADES NOW IN THE LAB
+--------------------------------------------------------------------------------
+
+  Point 1 — Cohort switch: --mode pilot|full (+ run_pilot / run_full wrappers)
+  Point 2 — Statistics: 95% CI + Wilcoxon paired FAR tests →
+             statistical_summary.csv, hypothesis_tests.csv
+  Point 3 — Cross-session: --split-mode losso → cross_session_results.csv
+  Point 4 — Ablations: scripts/run_ablation.py → ablation_enrollment /
+             ablation_features CSVs and figures
+  Point 5 — Reproducibility: set_global_seed + enriched run_meta.json
+             (versions, argv, timestamp, mode, hyperparams, git commit if any)
+
+
+--------------------------------------------------------------------------------
+7. CLOSING TAKEAWAY
+--------------------------------------------------------------------------------
+
+This codebase builds a miniature Zero Trust-style behavioural gatekeeper that
+learns how someone types, then stress-tests it with AI systems that invent
+fake typing in that person’s style. Against other people, the gatekeeper works
+well on all 51 subjects (~4.6% human impostor FAR). Against AI impersonation
+on the full cohort, it accepts ~98–100% of fakes (VAE/GAN) while formal tests
+show attack FAR far exceeds human FAR (p ≈ 10⁻¹⁰). The main message: checking
+“human-like behaviour” is useful, but not enough on its own once generative
+models can copy that behaviour — Zero Trust still needs stronger, multi-layered
+verification that anticipates synthetic mimics.
+
+
+================================================================================
+End of file
+================================================================================

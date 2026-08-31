@@ -1,0 +1,194 @@
+=== PROJECT_OVERVIEW_INTEXT ===
+Purpose: Single uploadable brief so another AI can understand this repository
+without reading the whole codebase. Plain text. ASCII section markers.
+
+=== GLOSSARY ===
+UEBA = User and Entity Behavior Analytics
+VAE = Variational Autoencoder
+GAN = Generative Adversarial Network (here WGAN-GP)
+FAR = False Acceptance Rate
+TAR = True Acceptance Rate
+EER = Equal Error Rate
+CI = Confidence Interval (95%)
+LOSO = Leave-One-Session-Out
+SVM = Support Vector Machine
+RF = Random Forest
+PE = Policy Engine (classifier standing in for PDP-style allow/deny)
+PDP = Policy Decision Point
+CLI = Command-Line Interface
+CSV = Comma-Separated Values
+JSON = JavaScript Object Notation
+std = standard deviation
+
+=== RESEARCH_QUESTION ===
+Can a Zero Trust-style Policy Engine (PE) trained ONLY on human keystroke
+dynamics still reject VAE/GAN-synthesized impersonation samples that mimic an
+authorized user’s typing rhythm?
+
+One-liner: Quantify UEBA resilience to generative keystroke impersonation.
+
+=== THREAT_MODEL ===
+- Attacker can observe / train on the target user’s enrollment keystroke vectors.
+- PE is trained on human genuine + human impostor samples only (never on fakes).
+- Attack samples are reserved strictly for testing (open-set style stress test).
+- Dataset: CMU Keystroke Dynamics Benchmark (DSL-StrongPasswordData.csv),
+  51 subjects × 400 reps of a fixed strong password.
+
+=== PIPELINE_STEPS ===
+1. DATA
+   DOES: Load/validate CMU CSV from data/raw/DSL-StrongPasswordData.csv
+   WHY: Public authentic human baseline matching the dissertation proposal.
+
+2. FEATURES
+   DOES: Extract timing feature sets (default hold_flight = Hold H.* + Flight DD.*)
+   WHY: UEBA typing fingerprint used by the PE.
+
+3. SPLIT
+   DOES: fixed default enroll sessions {1,2,3,4} / verify {5}; optional LOSO
+         over sessions {1,2,3,4,5}
+   WHY: Train/test separation; LOSO checks session robustness.
+
+4. TRAIN PE
+   DOES: Train SVM and/or Random Forest on human enroll + human impostors
+   WHY: Stand-in Policy Engine / PDP gatekeeper.
+
+5. ATTACK SYNTHESIS
+   DOES: Per-user VAE and/or WGAN-GP trained on enrollment vectors; sample fakes
+   WHY: Generative impersonation threat.
+
+6. EVALUATE
+   DOES: TAR/FAR/EER at EER threshold; attack FAR at same threshold;
+         mean±std±95% CI; Wilcoxon paired FAR tests
+   WHY: Report resilience and statistical support for attack > human FAR.
+
+=== CODEMAP ===
+data/raw/                      CMU CSV
+src/config.py                  Defaults, set_global_seed(), paths, VAE/GAN hyperparams
+src/data/loader.py             Load dataset, list subjects
+src/data/splits.py             SubjectSplit, build_subject_split,
+                               build_leave_one_session_out_splits,
+                               build_training_dataset, build_verification_dataset
+src/features/keystroke.py      Feature extraction for hold/flight/full/aggregated
+src/models/classifier.py       PE train/predict/save (SVM, RF)
+src/models/vae.py              VAE train/sample/save
+src/models/gan.py              WGAN-GP train/sample/save
+src/adversarial/synthesize.py  generate_impersonation_samples + save helpers
+src/evaluation/metrics.py      TAR/FAR/EER, attack metrics, summarize_with_ci,
+                               paired_far_test, summarize_attack_results,
+                               build_statistical_summary, build_hypothesis_tests
+src/experiment/runner.py       resolve_subjects, run_single_subject, write_run_meta,
+                               make_run_id, set shared path for all scripts
+scripts/run_experiment.py      Main CLI (--mode, --subjects, --split-mode, …)
+scripts/run_pilot.py           Wrapper → --mode pilot
+scripts/run_full.py            Wrapper → --mode full
+scripts/run_ablation.py        Enrollment-size + feature-set ablations
+scripts/generate_figures.py    Rebuild PNGs from CSVs (CI error bars when present)
+results/                       CSVs, figures, models, synthetic, run_meta.json
+notebooks/                     Phase notebooks 01–04
+concluded_results.txt          Layman conclusions
+instructions.txt               Beginner run book
+project_overview_intext        This file
+requirements.txt               Pinned deps (pip freeze style)
+
+=== CONFIG_DEFAULTS ===
+RANDOM_SEED = 42
+DEFAULT_MODE = pilot                 # pilot=first 5 subjects; full=all 51
+PILOT_SUBJECT_COUNT = 5
+EXPECTED_SUBJECT_COUNT = 51
+DEFAULT_FEATURE_SET = hold_flight
+FEATURE_SETS = hold, flight, hold_flight, full, aggregated
+DEFAULT_ENROLL_SESSIONS = (1,2,3,4)
+DEFAULT_VERIFY_SESSIONS = (5,)
+DEFAULT_SPLIT_MODE = fixed           # fixed | losso
+DEFAULT_CLASSIFIER = svm
+CLASSIFIER_TYPES = svm, random_forest
+DEFAULT_SYNTHETIC_SAMPLES = 80
+DEFAULT_IMPOSTOR_TRAIN_SAMPLES = 640
+VAE_DEFAULTS epochs=200 latent_dim=8 hidden_dim=64
+GAN_DEFAULTS epochs=300 latent_dim=16 hidden_dim=64 n_critic=5 lambda_gp=10
+--subjects overrides --mode when provided explicitly
+Outputs tagged with mode + run_id in CSV rows and run_meta.json
+
+=== METRICS ===
+TAR: fraction genuine verification scores >= threshold
+FAR_human: fraction human impostor scores >= threshold
+FAR_attack: fraction synthetic scores >= threshold
+EER threshold: operating point where FPR ≈ FNR (used for PE decisions)
+summarize_with_ci: mean, std, 95% CI (t-interval if n>=10 else bootstrap)
+paired_far_test: Wilcoxon signed-rank (alternative greater); fallback paired t
+Hypothesis claim printed: Attack FAR > human FAR (Wilcoxon p=…)
+
+=== CURRENT_RESULTS ===
+Source: latest FULL cohort run (mode=full, n_subjects=51, all CMU subjects,
+feature_set=hold_flight, split_mode=fixed, enroll {1,2,3,4} verify {5},
+classifier=svm ONLY, attacks=vae+gan, seed=42, tune_hyperparameters=true,
+VAE epochs=200, GAN epochs=300, run_id=full_42_20260827T042239Z).
+Artifacts: results/human_baseline.csv, attack_summary.csv,
+statistical_summary.csv, hypothesis_tests.csv, run_meta.json, figures/*.png
+
+Human baseline — SVM, mean across 51 subjects:
+  TAR ≈ 0.953  (95% CI ≈ 0.940–0.965)
+  FAR_human ≈ 0.046  (95% CI ≈ 0.033–0.058)
+  EER ≈ 0.007 (mean)
+
+Attack FAR — at same EER threshold, mean across 51 subjects:
+  VAE/SVM ≈ 0.996  (95% CI ≈ 0.994–0.999)
+  GAN/SVM ≈ 0.976  (95% CI ≈ 0.963–0.988)
+  TAR (genuine) stays ≈ 0.953
+
+Hypothesis tests (Wilcoxon signed-rank, H1: attack FAR > human FAR), n=51:
+  VAE/SVM: ΔFAR=0.9505 ; p=2.572e-10
+  GAN/SVM: ΔFAR=0.9299 ; p=2.572e-10
+
+Conclusion (empirical, full cohort):
+  RESEARCH_ANSWER: PE cannot reliably reject VAE/GAN impersonation.
+  Human FAR ~4.6% vs attack FAR ~99.6% (VAE) / ~97.6% (GAN).
+  Trust paradox strongly supported; VAE slightly more effective than GAN.
+
+Earlier pilot (n=5, svm+rf, --no-tune) showed same direction with p≈0.03;
+full cohort tightens CIs and yields much stronger significance.
+
+Optional extensions not in this primary run:
+  Random Forest classifier, LOSO (--split-mode losso), ablations (run_ablation.py)
+
+=== VALIDITY_UPGRADES (IMPLEMENTED) ===
+1. Cohort mode switch pilot|full + wrappers run_pilot.py / run_full.py
+2. 95% CI + Wilcoxon paired FAR tests → statistical_summary.csv,
+   hypothesis_tests.csv; FAR plots annotate mean±CI
+3. LOSO splits + --split-mode losso → cross_session_results.csv
+4. run_ablation.py enrollment + feature ablations + figures
+5. set_global_seed + enriched run_meta.json (mode, seed, subjects, feature_set,
+   classifiers, attacks, split_mode, enroll/verify, VAE/GAN hyperparams,
+   package versions, git commit if any, timestamp_utc, cli_argv, run_id)
+Shared core: src/experiment/runner.py::run_single_subject
+
+=== LIMITATIONS ===
+- Latest full run used SVM only (add --classifiers svm,random_forest for RF)
+- Fixed-password lab data ≠ live enterprise Zero Trust stack
+- Strong attacker assumption (access to enrollment timings)
+- split_mode=fixed uses verify session 5 only; use losso for session rotation
+- Do not mix pilot and full CSVs without checking run_meta.json (mode/run_id)
+
+=== HOW_TO_RUN ===
+cd <project_root>
+source .venv/bin/activate
+pip install -r requirements.txt   # first time
+
+# Pilot (default)
+python scripts/run_experiment.py --mode pilot --classifiers svm,random_forest --no-tune
+python scripts/run_pilot.py --classifiers svm,random_forest --no-tune
+
+# Full cohort
+python scripts/run_experiment.py --mode full --classifiers svm,random_forest
+python scripts/run_full.py
+
+# LOSO
+python scripts/run_experiment.py --mode pilot --split-mode losso --no-tune
+
+# Ablation (cheap defaults: 5 subjects, SVM, VAE, reduced epochs)
+python scripts/run_ablation.py --mode pilot
+
+# Figures only
+python scripts/generate_figures.py
+
+=== END ===

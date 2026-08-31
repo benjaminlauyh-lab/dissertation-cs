@@ -1,0 +1,233 @@
+================================================================================
+INSTRUCTIONS — How to run this dissertation lab (absolute beginner guide)
+================================================================================
+
+What this project does (one sentence):
+  It trains a typing-rhythm security checker, then measures whether AI
+  (VAE/GAN) fake typing can trick that checker into accepting impostors.
+
+
+--------------------------------------------------------------------------------
+0. GLOSSARY (read once)
+--------------------------------------------------------------------------------
+
+  UEBA   = User and Entity Behavior Analytics (learn normal behaviour, flag odd)
+  VAE    = Variational Autoencoder (one AI that invents fake typing)
+  GAN    = Generative Adversarial Network (another AI that invents fake typing)
+  FAR    = False Acceptance Rate (wrongly accept an impostor)
+  TAR    = True Acceptance Rate (correctly accept the real user)
+  EER    = Equal Error Rate (threshold where false accept ≈ false reject)
+  CI     = Confidence Interval (here: 95% uncertainty around a mean)
+  LOSO   = Leave-One-Session-Out (rotate which typing session is the test set)
+  SVM    = Support Vector Machine (one Policy Engine classifier)
+  RF     = Random Forest (the other Policy Engine classifier)
+  PE     = Policy Engine (the yes/no gatekeeper classifier)
+  CLI    = Command-Line Interface (flags you type after a script name)
+  CSV    = Comma-Separated Values (spreadsheet-like results file)
+  JSON   = JavaScript Object Notation (structured metadata file)
+
+
+--------------------------------------------------------------------------------
+1. OPEN A TERMINAL AND GO TO THE PROJECT
+--------------------------------------------------------------------------------
+
+macOS:
+  • Open “Terminal” (Spotlight → type Terminal → Enter)
+  • Copy-paste:
+
+    cd /Users/benjamin/Desktop/Projects/ML/Dessertation_Cs
+
+Windows (adjust the path to where you put the folder):
+    cd path\to\Dessertation_Cs
+
+
+--------------------------------------------------------------------------------
+2. CREATE / ACTIVATE THE PYTHON ENVIRONMENT
+--------------------------------------------------------------------------------
+
+First time only:
+
+    python3 -m venv .venv
+    source .venv/bin/activate          # macOS / Linux
+    # OR on Windows PowerShell:
+    # .venv\Scripts\Activate.ps1
+
+    pip install -r requirements.txt
+
+Every later session:
+
+    cd /Users/benjamin/Desktop/Projects/ML/Dessertation_Cs
+    source .venv/bin/activate
+
+
+--------------------------------------------------------------------------------
+3. MAKE SURE THE DATASET IS PRESENT
+--------------------------------------------------------------------------------
+
+Expected file:
+
+    data/raw/DSL-StrongPasswordData.csv
+
+If missing, download:
+
+    curl -o data/raw/DSL-StrongPasswordData.csv \
+      https://www.cs.cmu.edu/~keystroke/DSL-StrongPasswordData.csv
+
+
+--------------------------------------------------------------------------------
+4. CHOOSE PILOT (5 PEOPLE) OR FULL (51 PEOPLE)
+--------------------------------------------------------------------------------
+
+PILOT — fast check (DEFAULT; recommended first):
+
+    python scripts/run_pilot.py --classifiers svm,random_forest --no-tune \
+      --vae-epochs 100 --gan-epochs 150
+
+Same thing via the main script:
+
+    python scripts/run_experiment.py --mode pilot \
+      --classifiers svm,random_forest --no-tune \
+      --vae-epochs 100 --gan-epochs 150
+
+FULL cohort — dissertation-scale (LONG; can take a long time):
+
+    python scripts/run_full.py --classifiers svm,random_forest
+
+Or:
+
+    python scripts/run_experiment.py --mode full \
+      --classifiers svm,random_forest
+
+Notes:
+  • --mode pilot → first 5 subjects
+  • --mode full  → all 51 subjects
+  • If you also pass --subjects (number, IDs, or all), that OVERRIDE wins
+    over --mode (example: --subjects 10 runs 10 people even in pilot mode)
+
+
+--------------------------------------------------------------------------------
+5. OTHER USEFUL COMMANDS
+--------------------------------------------------------------------------------
+
+Human-only baseline (no AI attacks; fastest):
+
+    python scripts/run_experiment.py --mode pilot --classifiers svm \
+      --skip-attacks --no-tune
+
+Leave-one-session-out (LOSO) on the pilot cohort:
+
+    python scripts/run_experiment.py --mode pilot --split-mode losso \
+      --classifiers svm --attacks vae --no-tune --vae-epochs 80
+
+Ablations (enrollment size + feature sets; default = cheap SVM/VAE pilot):
+
+    python scripts/run_ablation.py --mode pilot --no-tune
+
+Redraw figures from existing CSVs (no re-training):
+
+    python scripts/generate_figures.py
+
+
+--------------------------------------------------------------------------------
+6. WHERE OUTPUTS GO (FOLDER MAP)
+--------------------------------------------------------------------------------
+
+  src/                  Python library code (data, models, metrics, runner)
+  scripts/              Commands you run from Terminal
+  data/raw/             Original CMU CSV
+  results/              Everything a run writes
+    human_baseline.csv          Per-subject human TAR/FAR/EER
+    attack_results.csv          Per-subject attack FAR
+    attack_summary.csv          Mean ± std (± CI columns) across subjects
+    statistical_summary.csv     Stats table with 95% CI columns
+    hypothesis_tests.csv        Wilcoxon / paired tests (attack vs human FAR)
+    cross_session_results.csv   Present after --split-mode losso
+    ablation_enrollment.csv     Enrollment-size ablation rows
+    ablation_features.csv       Feature-set ablation rows
+    run_meta.json               Receipt: mode, seed, subjects, versions, argv
+    figures/*.png               Charts for the dissertation
+    models/                     Saved Policy Engines / VAE / GAN (if enabled)
+    synthetic/                  Saved fake typing samples (if enabled)
+
+
+--------------------------------------------------------------------------------
+7. HOW TO READ THE MAIN RESULTS
+--------------------------------------------------------------------------------
+
+A) results/attack_summary.csv or statistical_summary.csv
+   Look at columns:
+     far_human_mean   → how often OTHER PEOPLE were wrongly accepted
+     far_attack_mean  → how often AI FAKES were wrongly accepted
+     *_ci_low / *_ci_high → 95% confidence interval around those means
+   If far_attack_mean is much larger than far_human_mean, AI impersonation
+   is beating the gatekeeper.
+
+B) results/hypothesis_tests.csv
+   Look at p_value for each (method, classifier).
+   Small p (e.g. < 0.05) supports: attack FAR > human FAR (not just chance).
+
+C) PNG figures in results/figures/
+   far_comparison.png   — side-by-side human vs attack FAR (mean ± CI)
+   far_delta.png        — how much FAR increases under attack
+   human_baseline.png   — human-only TAR/FAR/EER spread
+   ablation_*.png       — sensitivity plots (after ablation run)
+
+D) results/run_meta.json
+   Always check mode (pilot/full), subjects list, seed, and timestamp so you
+   do not mix two different runs when writing the dissertation.
+
+
+--------------------------------------------------------------------------------
+8. TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+“No module named src …”
+  → You are not in the project folder, or .venv is not activated.
+     cd to the project root and run: source .venv/bin/activate
+
+“FileNotFoundError … DSL-StrongPasswordData.csv”
+  → Put/download the CSV under data/raw/ (see section 3).
+
+Missing attack_summary.csv / statistical_summary.csv
+  → You probably used --skip-attacks, or the run crashed before finishing.
+     Re-run without --skip-attacks.
+
+Full mode is “stuck” / very slow
+  → Expected: 51 subjects × classifiers × VAE+GAN training is heavy.
+     Start with --mode pilot. Use --no-tune and lower --vae-epochs /
+     --gan-epochs for quicker drafts.
+
+Want only 10 subjects without memorising flags
+  → python scripts/run_experiment.py --subjects 10 --classifiers svm --no-tune
+
+Matplotlib cache / font warnings
+  → Usually harmless. You can set:
+       export MPLCONFIGDIR="$(pwd)/.mplconfig"
+
+
+--------------------------------------------------------------------------------
+9. SUGGESTED PATH
+--------------------------------------------------------------------------------
+
+  1. Activate .venv
+  2. Run the pilot command in section 4 (quick sanity check)
+  3. Run full cohort when ready:
+       python scripts/run_experiment.py --mode full
+     (Latest completed full run: 51 subjects, SVM, VAE+GAN — see run_meta.json)
+  4. Open results/statistical_summary.csv and results/hypothesis_tests.csv
+  5. Open results/figures/far_comparison.png
+  6. Read concluded_results.txt for plain-language interpretation
+
+Latest full-cohort headline (SVM, n=51, run_meta.json mode=full):
+  TAR ≈ 95.3%  |  Human FAR ≈ 4.6%
+  VAE attack FAR ≈ 99.6% (ΔFAR=0.9505)  |  GAN ≈ 97.6% (ΔFAR=0.9299)
+  Wilcoxon p ≈ 2.572×10⁻¹⁰ — attack FAR significantly exceeds human FAR
+
+CONCLUSION IN ONE SENTENCE:
+  The typing gatekeeper works against other humans but cannot stop AI-faked
+  typing; behavioural UEBA alone is insufficient for Zero Trust verification.
+
+
+================================================================================
+End of instructions
+================================================================================
