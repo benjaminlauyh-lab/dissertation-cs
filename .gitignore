@@ -1,0 +1,17 @@
+.venv/
+.matplotlib_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+.DS_Store
+
+# Large raw data (re-downloadable from CMU)
+data/raw/*.csv
+
+# Experiment outputs
+results/models/
+results/synthetic/
+results/figures/
+results/*.csv
+results/*.json
