@@ -1,0 +1,5 @@
+subject,method,classifier_type,tar,far_human,far_attack,threshold,n_synthetic,mode,run_id,feature_set,split_mode,enroll_sessions,verify_sessions,verify_session,n_enroll_sessions
+s002,vae,svm,0.74,0.2604,1.0,0.003981296381834339,20,pilot,ablation_pilot_42_20260724T055138Z,hold_flight,fixed,1,5,5,1
+s002,vae,svm,0.86,0.1392,1.0,0.024040721689194616,20,pilot,ablation_pilot_42_20260724T055138Z,hold_flight,fixed,"1,2",5,5,2
+s002,vae,svm,0.88,0.1256,1.0,0.06904977569224376,20,pilot,ablation_pilot_42_20260724T055138Z,hold_flight,fixed,"1,2,3",5,5,3
+s002,vae,svm,0.92,0.082,1.0,0.12837596992094016,20,pilot,ablation_pilot_42_20260724T055138Z,hold_flight,fixed,"1,2,3,4",5,5,4

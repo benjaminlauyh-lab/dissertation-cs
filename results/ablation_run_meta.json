@@ -1,0 +1,99 @@
+{
+  "mode": "pilot",
+  "run_id": "ablation_pilot_42_20260724T055138Z",
+  "seed": 42,
+  "subjects": [
+    "s002"
+  ],
+  "n_subjects": 1,
+  "feature_set": "hold_flight",
+  "classifiers": [
+    "svm"
+  ],
+  "attacks": [
+    "vae"
+  ],
+  "split_mode": "fixed",
+  "enroll_sessions": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "verify_sessions": [
+    5
+  ],
+  "n_synthetic": 20,
+  "vae_hyperparams": {
+    "latent_dim": 8,
+    "hidden_dim": 64,
+    "epochs": 20,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "beta": 1.0
+  },
+  "gan_hyperparams": {
+    "latent_dim": 16,
+    "hidden_dim": 64,
+    "epochs": 100,
+    "batch_size": 32,
+    "learning_rate": 0.0001,
+    "n_critic": 5,
+    "lambda_gp": 10.0
+  },
+  "package_versions": {
+    "numpy": "2.5.1",
+    "pandas": "3.0.3",
+    "sklearn": "1.9.0",
+    "torch": "2.13.0",
+    "scipy": "1.18.0"
+  },
+  "git_commit": null,
+  "timestamp_utc": "2026-07-24T05:51:40.507558+00:00",
+  "cli_argv": [
+    "scripts/run_ablation.py",
+    "--mode",
+    "pilot",
+    "--subjects",
+    "1",
+    "--classifiers",
+    "svm",
+    "--attacks",
+    "vae",
+    "--feature-sets",
+    "hold_flight,hold",
+    "--vae-epochs",
+    "20",
+    "--n-synthetic",
+    "20"
+  ],
+  "ablation": {
+    "enrollment_schedule": [
+      [
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        2,
+        3
+      ],
+      [
+        1,
+        2,
+        3,
+        4
+      ]
+    ],
+    "feature_sets": [
+      "hold_flight",
+      "hold"
+    ],
+    "skip_enrollment": false,
+    "skip_features": false
+  },
+  "tune_hyperparameters": false
+}

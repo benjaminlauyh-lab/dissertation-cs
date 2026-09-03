@@ -1,0 +1,112 @@
+{
+  "mode": "full",
+  "run_id": "full_42_20260827T042239Z",
+  "seed": 42,
+  "subjects": [
+    "s002",
+    "s003",
+    "s004",
+    "s005",
+    "s007",
+    "s008",
+    "s010",
+    "s011",
+    "s012",
+    "s013",
+    "s015",
+    "s016",
+    "s017",
+    "s018",
+    "s019",
+    "s020",
+    "s021",
+    "s022",
+    "s024",
+    "s025",
+    "s026",
+    "s027",
+    "s028",
+    "s029",
+    "s030",
+    "s031",
+    "s032",
+    "s033",
+    "s034",
+    "s035",
+    "s036",
+    "s037",
+    "s038",
+    "s039",
+    "s040",
+    "s041",
+    "s042",
+    "s043",
+    "s044",
+    "s046",
+    "s047",
+    "s048",
+    "s049",
+    "s050",
+    "s051",
+    "s052",
+    "s053",
+    "s054",
+    "s055",
+    "s056",
+    "s057"
+  ],
+  "n_subjects": 51,
+  "feature_set": "hold_flight",
+  "classifiers": [
+    "svm"
+  ],
+  "attacks": [
+    "vae",
+    "gan"
+  ],
+  "split_mode": "fixed",
+  "enroll_sessions": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "verify_sessions": [
+    5
+  ],
+  "n_synthetic": 80,
+  "vae_hyperparams": {
+    "latent_dim": 8,
+    "hidden_dim": 64,
+    "epochs": 200,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "beta": 1.0
+  },
+  "gan_hyperparams": {
+    "latent_dim": 16,
+    "hidden_dim": 64,
+    "epochs": 300,
+    "batch_size": 32,
+    "learning_rate": 0.0001,
+    "n_critic": 5,
+    "lambda_gp": 10.0
+  },
+  "package_versions": {
+    "numpy": "2.5.1",
+    "pandas": "3.0.3",
+    "sklearn": "1.9.0",
+    "torch": "2.13.0",
+    "scipy": "1.18.0"
+  },
+  "git_commit": null,
+  "timestamp_utc": "2026-08-27T04:27:19.821958+00:00",
+  "cli_argv": [
+    "scripts/run_experiment.py",
+    "--mode",
+    "full"
+  ],
+  "tune_hyperparameters": true,
+  "device": "cpu",
+  "impostor_samples": 640
+}
